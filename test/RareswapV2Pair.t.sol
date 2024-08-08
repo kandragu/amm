@@ -102,4 +102,35 @@ contract RareswapV2PairTest is Test {
         pair.mint();
         // assertEq(pair.balanceOf(address(this)), 0);
     }
+
+    function testBurn() public {
+        token0.transfer(address(pair), 1 ether);
+        token1.transfer(address(pair), 1 ether);
+
+        pair.mint(); // + 1 LP
+
+        uint balance = pair.balanceOf(address(this));
+        pair.transfer(address(pair), balance);
+        pair.burn();
+
+        assertEq(pair.balanceOf(address(this)), 0);
+    }
+
+    function testBurnUnbalancedLp() public {
+        token0.transfer(address(pair), 1 ether);
+        token1.transfer(address(pair), 1 ether);
+
+        pair.mint(); // + 1 LP
+
+        token0.transfer(address(pair), 2 ether);
+        token1.transfer(address(pair), 1 ether);
+
+        pair.mint(); // + 1 LP
+
+        uint balance = pair.balanceOf(address(this));
+        pair.transfer(address(pair), balance);
+        pair.burn();
+
+        assertEq(pair.balanceOf(address(this)), 0);
+    }
 }
