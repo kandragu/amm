@@ -16,8 +16,8 @@ contract RareswapV2PairTest is Test {
 
         pair = new RareswapV2Pair(address(token0), address(token1));
 
-        token0.mint(address(this), 10 ether);
-        token1.mint(address(this), 10 ether);
+        token0.mint(address(this), 100 ether);
+        token1.mint(address(this), 100 ether);
     }
 
     function assertReserves(
@@ -132,5 +132,19 @@ contract RareswapV2PairTest is Test {
         pair.burn();
 
         assertEq(pair.balanceOf(address(this)), 0);
+    }
+
+    function testSwap() public {
+        token0.transfer(address(pair), 50 ether);
+        token1.transfer(address(pair), 50 ether);
+
+        pair.mint();
+
+        token0.transfer(address(pair), 1 ether);
+
+        pair.swap(0, 0.97 ether, address(this), "");
+
+        console.log("balanceOf", token0.balanceOf(address(this)));
+        console.log("balanceOf", token1.balanceOf(address(this)));
     }
 }

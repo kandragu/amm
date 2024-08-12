@@ -4,6 +4,7 @@ pragma solidity 0.8.19;
 import "../libraries/Math.sol";
 import "solmate/tokens/ERC20.sol";
 import "../interfaces/IUniswapV2Pair.sol";
+import "../interfaces/IRareswapV2Callee.sol";
 
 import {console} from "forge-std/Test.sol";
 
@@ -108,5 +109,67 @@ contract RareswapV2Pair is ERC20 {
         if (!success || (data.length > 0 && !abi.decode(data, (bool)))) {
             revert TransferFailed();
         }
+    }
+
+    // @dev swap function
+    function swap(
+        uint256 amount0Out,
+        uint256 amount1Out,
+        address to,
+        bytes calldata data
+    ) public {
+        require(
+            amount0Out > 0 || amount1Out > 0,
+            "RareswapV2Pair: INSUFFICIENT_OUTPUT_AMOUNT"
+        );
+
+        (uint112 _reserve0, uint112 _reserve1, ) = getReserves();
+
+        require(
+            amount0Out < _reserve0 && amount1Out < _reserve1,
+            "RareswapV2Pair: INSUFFICIENT_LIQUIDITY"
+        );
+
+        if (amount0Out > 0) _safeTransfer(token0, to, amount0Out);
+        if (amount1Out > 0) _safeTransfer(token1, to, amount1Out);
+
+        if (data.length > 0)
+            IRareswapV2Callee(to).rareswapV2Call(
+                msg.sender,
+                amount0Out,
+                amount1Out,
+                data
+            );
+
+        uint256 balance0 = IERC20(token0).balanceOf(address(this));
+        uint256 balance1 = IERC20(token1).balanceOf(address(this));
+
+        // NOTE:
+        // balance0Adjusted = balance0 * 1000 - (amount0In * 3);
+        // balance1Adjusted / 1000 = balance1  - (amount1In * 3) / 1000;
+        uint256 amount0In = balance0 > _reserve0 - amount0Out
+            ? balance0 - (_reserve0 - amount0Out)
+            : 0;
+        uint256 amount1In = balance1 > _reserve1 - amount1Out
+            ? balance1 - (_reserve1 - amount1Out)
+            : 0;
+
+        require(
+            amount0In > 0 || amount1In > 0,
+            "RareswapV2Pair: INSUFFICIENT_INPUT_AMOUNT"
+        );
+        // NOTE:
+        // (x0 + dx * (1- f)) (y0 -dy) >= x0 * y0
+        //
+        uint balance0Adjusted = balance0 * 1000 - (amount0In * 3);
+        uint balance1Adjusted = balance1 * 1000 - (amount1In * 3);
+
+        require(
+            balance0Adjusted * balance1Adjusted >=
+                uint(_reserve0) * uint(_reserve1) * 1000 ** 2,
+            "RareswapV2Pair: K"
+        );
+
+        _update(balance0, balance1);
     }
 }
